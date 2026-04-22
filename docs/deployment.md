@@ -36,24 +36,30 @@ Une fois le build terminé, Vercel attribue une URL `*.vercel.app`. Cette URL re
 
 1. Ouvrir le projet → **Settings → Domains**
 2. Champ d'ajout en haut : saisir `skills.gig-consulting.com` → **Add**
-3. Vercel affiche la configuration DNS attendue :
+3. Dans la popup, laisser **Connect to an environment = Production** et cliquer **Save**
+4. Le domaine apparaît avec le badge rouge "Invalid Configuration". Cliquer sur **Learn more** puis sur l'onglet **DNS Records**
+5. Vercel affiche la configuration DNS attendue, typiquement :
    - Type : `CNAME`
    - Name : `skills`
-   - Value : `cname.vercel-dns.com`
-4. Noter la valeur exacte du CNAME (elle peut varier légèrement selon la région)
+   - Value : `<hash>.vercel-dns-017.com.` (ex. `8f01ad62921b2c28.vercel-dns-017.com.`)
+
+Important : la valeur est un hash unique **propre à ton projet Vercel**, pas la valeur historique `cname.vercel-dns.com`. Vercel migre ses IP ranges et recommande maintenant cette nouvelle cible. L'ancienne fonctionne encore mais va être dépréciée.
+
+**Ne PAS utiliser l'onglet "Vercel DNS"** : il propose de déléguer toute la gestion DNS du domaine racine à Vercel (via des nameservers `ns1.vercel-dns.com` / `ns2.vercel-dns.com`), ce qui casserait le site principal `gig-consulting.com`, les emails Google Workspace et tous les autres sous-domaines existants.
 
 **Côté one.com** :
 
-1. Se connecter sur [one.com](https://www.one.com), aller dans l'administration du domaine `gig-consulting.com`
-2. Menu **Paramètres DNS / Zone DNS / Advanced DNS settings**
-3. Section **Enregistrements DNS** → **Créer un nouvel enregistrement DNS** :
-   - Nom d'hôte : `skills`
+1. Se connecter sur [one.com](https://www.one.com). Sur la page d'accueil, le domaine `gig-consulting.com` est déjà sélectionné dans la sidebar gauche.
+2. Menu de gauche → **DNS settings**
+3. Scroll jusqu'à la section **Personal DNS settings** → bouton **Create a new record** ou équivalent
+4. Remplir :
+   - Hostname / Name : `skills`
    - Type : `CNAME`
-   - Cible : `cname.vercel-dns.com.` (point final toléré)
+   - Target : la valeur exacte fournie par Vercel (ex. `8f01ad62921b2c28.vercel-dns-017.com.`)
    - TTL : `3600`
-4. Sauvegarder
+5. Sauvegarder
 
-**Ne pas toucher** aux enregistrements A, MX, TXT, ni aux autres CNAME : ils concernent le site principal `gig-consulting.com` et la messagerie. Seul l'enregistrement `skills` CNAME est ajouté.
+**Ne pas toucher** aux enregistrements existants (A, MX Google, autres CNAME comme `www`, `ftp`, `sftp`, `ssh`) : ils concernent le site principal, la messagerie et les services one.com. Seul l'enregistrement `skills` CNAME est ajouté.
 
 ### 3. Attendre la propagation
 
@@ -65,8 +71,11 @@ Vérifier en ligne de commande :
 
 ```bash
 dig skills.gig-consulting.com CNAME +short
-# Doit afficher : cname.vercel-dns.com.
+# Doit afficher la valeur exacte fournie par Vercel
+# (ex. 8f01ad62921b2c28.vercel-dns-017.com.)
 ```
+
+Une fois la propagation confirmée, revenir sur Vercel → Settings → Domains → bouton **Refresh** à côté du domaine. Le statut passe de "Invalid Configuration" à "Valid Configuration". Vercel provisionne le certificat HTTPS dans la foulée (30 secondes à 2 minutes).
 
 ## Workflow de mise à jour
 
