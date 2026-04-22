@@ -10,7 +10,8 @@
     "lint": "next lint",
     "scan": "tsx scripts/scan-skills.ts",
     "scan:default": "tsx scripts/scan-skills.ts --input ~/.claude/skills --input ~/.claude/plugins --input ./my-skills --output data/skills.json",
-    "ship": "bash scripts/ship.sh"
+    "ship": "bash scripts/ship.sh",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",

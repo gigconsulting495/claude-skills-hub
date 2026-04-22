@@ -154,6 +154,80 @@ Vercel redéploie automatiquement sur chaque push `main`. Pas d'étape manuelle.
 
 Pour aller plus loin, `npm run ship` peut être wrappé dans une tâche `launchd` (macOS) ou `cron` qui le lance quotidiennement avec un message auto-généré. Pas mis en place aujourd'hui car ça sacrifie le contrôle sur le timing et les messages de commit.
 
+## Versioning et releases SemVer
+
+Le projet suit [Semantic Versioning](https://semver.org/lang/fr/) : `MAJOR.MINOR.PATCH`.
+
+| Changement | Bump | Exemple |
+| --- | --- | --- |
+| Bugfix, changement interne invisible | **patch** | `1.0.0` → `1.0.1` |
+| Nouvelle feature rétrocompatible (catégorie, filtre, script) | **minor** | `1.0.0` → `1.1.0` |
+| Breaking change dans l'UI, les URLs de skills, ou le modèle de données | **major** | `1.0.0` → `2.0.0` |
+
+### Raccourci : `npm run release`
+
+Un script unique enchaîne tout le workflow de release (bump + commit + tag annoté + push + release GitHub avec notes auto-générées) :
+
+```bash
+# Interactif (demande confirmation avant d'exécuter)
+npm run release -- patch
+npm run release -- minor
+npm run release -- major
+
+# Non-interactif (utile en CI)
+npm run release -- patch --yes
+
+# Simulation sans rien faire (pour voir ce qui serait publié)
+npm run release -- minor --dry-run
+```
+
+Ce que ça fait :
+
+1. Vérifie que tu es sur `main`, que le working tree est clean et que `main` est à jour avec `origin/main`
+2. Vérifie que `gh` CLI est installé et authentifié
+3. Calcule la nouvelle version selon le type de bump
+4. Collecte les commits depuis le dernier tag (filtre les précédents `release:` et les trailers `Co-Authored-By`)
+5. Lance `npm run build` + `npm audit --audit-level=critical` (sécurité)
+6. Affiche un résumé et demande confirmation (sauf `--yes`)
+7. Bumpe `package.json`, commit, tag annoté avec les notes
+8. Push commit + tag
+9. Crée la release GitHub avec les notes auto-générées
+
+### Exemple de notes auto-générées
+
+Si les commits depuis le dernier tag sont :
+
+```
+add: nouveau skill mermaid-diagram
+fix: tri des skills par date
+docs: clarifier workflow ship
+```
+
+La release sera publiée avec des notes type :
+
+```markdown
+Release v1.1.0 du catalogue claude-skills-hub.
+
+## Changements depuis v1.0.0
+
+- add: nouveau skill mermaid-diagram
+- fix: tri des skills par date
+- docs: clarifier workflow ship
+
+## Liens
+
+- Site en ligne : skills.gig-consulting.com
+- Documentation : docs/
+```
+
+### Comportement sur erreur
+
+Chaque check échoué avant la section "Actions à exécuter" sort immédiatement sans rien modifier. Après la confirmation (étape 6), si une des actions échoue (push refusé, `gh release create` en erreur), les logs sont dans `/tmp/release-*.log` et il faut corriger manuellement l'état (rollback du tag local, etc.).
+
+### Aucune release à faire
+
+Si aucun commit significatif n'existe depuis le dernier tag, le script sort avec `aucun commit significatif depuis le dernier tag. Rien à releaser.`
+
 ## Conventions de commit pour les mises à jour
 
 Pour garder l'historique lisible :

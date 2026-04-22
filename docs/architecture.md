@@ -71,7 +71,8 @@ claude-skills-hub/
 │   └── utils.ts                # cn, slugify, daysSince, formatRelativeDays
 ├── scripts/
 │   ├── scan-skills.ts          # CLI qui génère data/skills.json
-│   └── ship.sh                 # Workflow de publication (scan + build + commit + push)
+│   ├── ship.sh                 # Workflow de publication (scan + build + commit + push)
+│   └── release.sh              # Workflow de release SemVer (bump + tag + release GitHub)
 ├── data/
 │   └── skills.json             # Données produites par le scan (committé)
 ├── docs/                       # Cette documentation

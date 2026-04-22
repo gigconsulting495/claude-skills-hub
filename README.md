@@ -36,6 +36,7 @@ npm install
 | `npm run lint`              | Lint ESLint avec la config Next.js                                                   |
 | `npm run ship`              | Scan + détection auto des changements + build + audit + commit + push (message auto-généré) |
 | `npm run ship -- "msg"`     | Idem, avec message de commit forcé. Voir [docs/deployment.md](docs/deployment.md) |
+| `npm run release -- <bump>` | Release SemVer : bump version + tag annoté + push + release GitHub. `<bump>` = `patch`/`minor`/`major` |
 
 ### Exemple de scan ciblé
 
