@@ -1,6 +1,6 @@
 {
   "name": "claude-skills-hub",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Catalogue visuel des skills Claude (Code, Cowork, plugins) avec filtres par catégorie, recherche et actions rapides.",
   "scripts": {
