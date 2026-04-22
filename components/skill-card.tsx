@@ -1,0 +1,150 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowUpRight, Clipboard, Check, FileText, Package, Sparkles, User } from "lucide-react";
+import { useState } from "react";
+import type { Skill } from "@/lib/types";
+import { getCategory } from "@/lib/categories";
+
+interface Props {
+  skill: Skill;
+  index?: number;
+}
+
+function SourceBadge({ source }: { source: Skill["source"] }) {
+  if (source === "perso") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-terracotta-500 text-white px-2 py-0.5 text-[11px] font-medium shadow-sm">
+        <User className="h-3 w-3" />
+        Perso
+      </span>
+    );
+  }
+  if (source === "plugin") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--border))] text-[rgb(var(--fg))] px-2 py-0.5 text-[11px] font-medium">
+        <Package className="h-3 w-3" />
+        Plugin
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--border))]/60 text-[rgb(var(--fg-muted))] px-2 py-0.5 text-[11px] font-medium">
+      <Sparkles className="h-3 w-3" />
+      Système
+    </span>
+  );
+}
+
+export function SkillCard({ skill, index = 0 }: Props) {
+  const category = getCategory(skill.category);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(skill.displayPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* noop */
+    }
+  };
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.4) }}
+      className="group relative flex flex-col h-full surface rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 hover:border-terracotta-300"
+    >
+      {/* Liseré coloré en haut */}
+      <div
+        className="absolute top-0 left-5 right-5 h-[2px] rounded-b-full opacity-70"
+        style={{ backgroundColor: category.color }}
+      />
+
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+            style={{
+              backgroundColor: `${category.color}22`,
+              color: category.color,
+            }}
+          >
+            {category.label}
+          </span>
+          <SourceBadge source={skill.source} />
+        </div>
+      </div>
+
+      <Link href={`/skills/${skill.slug}`} className="flex-1 block">
+        <h3 className="font-serif text-xl font-medium tracking-tight mb-2 group-hover:text-terracotta-500 transition-colors">
+          {skill.name}
+        </h3>
+        <p className="text-sm muted-text line-clamp-4 leading-relaxed">
+          {skill.description}
+        </p>
+      </Link>
+
+      {skill.plugin?.name && (
+        <div className="mt-3 text-[11px] muted-text flex items-center gap-1.5">
+          <Package className="h-3 w-3" />
+          <span className="truncate">{skill.plugin.name}</span>
+        </div>
+      )}
+
+      {skill.tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {skill.tags.slice(0, 4).map((t) => (
+            <span
+              key={t}
+              className="text-[10px] uppercase tracking-wide muted-text border border-[rgb(var(--border))] rounded px-1.5 py-0.5"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 pt-4 border-t border-[rgb(var(--border))] flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--bg))] border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs muted-text hover:text-[rgb(var(--fg))] hover:border-terracotta-300 transition"
+          title={skill.displayPath}
+        >
+          {copied ? (
+            <>
+              <Check className="h-3 w-3 text-green-600" /> Copié
+            </>
+          ) : (
+            <>
+              <Clipboard className="h-3 w-3" /> Chemin
+            </>
+          )}
+        </button>
+        <Link
+          href={`/skills/${skill.slug}`}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-terracotta-500/10 border border-terracotta-500/30 px-2.5 py-1.5 text-xs font-medium text-terracotta-700 dark:text-terracotta-300 hover:bg-terracotta-500 hover:text-white hover:border-terracotta-500 transition"
+        >
+          <FileText className="h-3 w-3" /> SKILL.md
+        </Link>
+        {skill.externalUrl && (
+          <a
+            href={skill.externalUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center rounded-lg border border-[rgb(var(--border))] p-1.5 muted-text hover:text-terracotta-500 hover:border-terracotta-300 transition"
+            aria-label="Ouvrir la source"
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        )}
+      </div>
+    </motion.article>
+  );
+}
