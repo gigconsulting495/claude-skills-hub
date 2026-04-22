@@ -43,7 +43,15 @@ const DEFAULT_OUTPUT = path.join(process.cwd(), "data", "skills.json");
 
 // Marqueurs qui identifient l'emplacement d'un skill perso.
 // Si le chemin contient un de ces segments, le skill est marqué "perso".
-const PERSO_MARKERS = ["my-skills", "Skill_management", "perso-skills"];
+// Note : `.claude/skills` est inclus car les skills installés directement
+// dans ce dossier sont considérés comme des skills perso de l'utilisateur
+// (à distinguer des skills qui viennent d'un plugin dans `.claude/plugins`).
+const PERSO_MARKERS = [
+  "my-skills",
+  "Skill_management",
+  "perso-skills",
+  ".claude/skills",
+];
 
 // ------------------------------------------------------------------
 // CLI args parsing
@@ -120,21 +128,40 @@ function detectSource(skillPath: string): {
 } {
   const norm = skillPath.replace(/\\/g, "/");
 
-  // 1. Skill perso : chemin contient un marker perso
+  // 1. Plugin : présence d'un plugin.json dans un ancêtre (prioritaire
+  //    pour éviter qu'un plugin imbriquant `.claude/skills` soit mal classé).
+  const pluginInfo = findPluginManifest(skillPath);
+  if (pluginInfo) {
+    return { source: "plugin", plugin: pluginInfo };
+  }
+
+  // 2. Plugin sans manifest : chemin contient `.claude/plugins/…/<plugin>/…`.
+  //    Certains plugins officiels n'ont pas de `plugin.json` mais restent
+  //    clairement des plugins — on les détecte via leur emplacement.
+  const pluginFromPath = findPluginFromPath(norm);
+  if (pluginFromPath) {
+    return { source: "plugin", plugin: pluginFromPath };
+  }
+
+  // 3. Skill perso : chemin contient un marker perso
   for (const marker of PERSO_MARKERS) {
     if (norm.includes(`/${marker}/`) || norm.includes(`/${marker}`)) {
       return { source: "perso" };
     }
   }
 
-  // 2. Plugin : présence d'un plugin.json dans un ancêtre
-  const pluginInfo = findPluginManifest(skillPath);
-  if (pluginInfo) {
-    return { source: "plugin", plugin: pluginInfo };
-  }
-
-  // 3. Sinon = skill système
+  // 4. Sinon = skill système (Claude Code intégré, rarement scanné)
   return { source: "system" };
+}
+
+function findPluginFromPath(normalizedPath: string): SkillPlugin | undefined {
+  // Cible les chemins du type `.../plugins/<pluginName>/skills/<skillName>/SKILL.md`
+  // ou `.../plugins/<marketplace>/<...>/<pluginName>/skills/<skillName>/SKILL.md`.
+  const match = normalizedPath.match(/\/plugins\/([^/]+(?:\/[^/]+)*?)\/skills\//);
+  if (!match) return undefined;
+  const pluginSegment = match[1].split("/").pop();
+  if (!pluginSegment) return undefined;
+  return { name: pluginSegment };
 }
 
 function findPluginManifest(startPath: string): SkillPlugin | undefined {
@@ -177,6 +204,17 @@ interface RawSkill {
   raw: string;
 }
 
+// Dossiers à ignorer lors du scan récursif.
+// `cache` est présent dans ~/.claude/plugins/cache/ qui contient des copies
+// versionnées des plugins déjà référencées via ~/.claude/plugins/marketplaces/.
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  "cache",
+  "install-counts-cache.json",
+]);
+
 function findSkillFiles(rootDir: string, acc: RawSkill[] = []): RawSkill[] {
   if (!fs.existsSync(rootDir)) return acc;
 
@@ -190,13 +228,8 @@ function findSkillFiles(rootDir: string, acc: RawSkill[] = []): RawSkill[] {
   for (const entry of entries) {
     const fullPath = path.join(rootDir, entry.name);
 
-    // On skippe les node_modules, .git, .next, etc. par sécurité
-    if (
-      entry.isDirectory() &&
-      !entry.name.startsWith(".git") &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".next"
-    ) {
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name) || entry.name.startsWith(".git")) continue;
       findSkillFiles(fullPath, acc);
     } else if (entry.isFile() && entry.name === "SKILL.md") {
       try {
@@ -297,6 +330,25 @@ function aggregate(skills: Skill[]): Omit<SkillsData, "generatedAt" | "scannedPa
 }
 
 // ------------------------------------------------------------------
+// Déduplication helper
+// ------------------------------------------------------------------
+
+/**
+ * Score un chemin de skill pour la résolution des doublons :
+ * - Les chemins dans `.claude/plugins/cache/` sont disqualifiés
+ *   (score très bas) car ce sont des copies versionnées.
+ * - Les skills perso (`.claude/skills/`) sont privilégiés.
+ * - En dernier ressort, on préfère les chemins courts (plus stables).
+ */
+function scoreSkillPath(absPath: string): number {
+  const norm = absPath.replace(/\\/g, "/");
+  if (norm.includes("/.claude/plugins/cache/")) return -100;
+  if (norm.includes("/.claude/skills/")) return 10;
+  if (norm.includes("/marketplaces/")) return 5;
+  return -Math.floor(norm.length / 50);
+}
+
+// ------------------------------------------------------------------
 // Main
 // ------------------------------------------------------------------
 
@@ -321,7 +373,7 @@ function main() {
     );
   }
 
-  const skills = rawSkills
+  const built = rawSkills
     .map((r) => {
       try {
         return buildSkill(r);
@@ -332,13 +384,30 @@ function main() {
         return undefined;
       }
     })
-    .filter((s): s is Skill => Boolean(s))
-    .sort((a, b) => {
-      // Perso d'abord, puis par nom
-      if (a.source === "perso" && b.source !== "perso") return -1;
-      if (b.source === "perso" && a.source !== "perso") return 1;
-      return a.name.localeCompare(b.name);
-    });
+    .filter((s): s is Skill => Boolean(s));
+
+  // Déduplication par slug : si deux skills produisent le même slug (ex. un
+  // plugin présent à la fois dans plusieurs marketplaces), on garde celui
+  // dont le chemin est le plus "stable" (hors cache/, le plus récent sinon).
+  const bySlug = new Map<string, Skill>();
+  for (const skill of built) {
+    const existing = bySlug.get(skill.slug);
+    if (!existing) {
+      bySlug.set(skill.slug, skill);
+      continue;
+    }
+    const existingScore = scoreSkillPath(existing.path);
+    const newScore = scoreSkillPath(skill.path);
+    if (newScore > existingScore) {
+      bySlug.set(skill.slug, skill);
+    }
+  }
+  const skills = Array.from(bySlug.values()).sort((a, b) => {
+    // Perso d'abord, puis par nom
+    if (a.source === "perso" && b.source !== "perso") return -1;
+    if (b.source === "perso" && a.source !== "perso") return 1;
+    return a.name.localeCompare(b.name);
+  });
 
   const agg = aggregate(skills);
 

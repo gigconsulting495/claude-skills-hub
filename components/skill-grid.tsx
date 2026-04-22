@@ -2,15 +2,39 @@
 
 import { useMemo, useState } from "react";
 import Fuse from "fuse.js";
-import { AnimatePresence, motion } from "framer-motion";
-import type { SkillsData } from "@/lib/types";
+import { Package, Sparkles, Telescope, User } from "lucide-react";
+import type { Skill, SkillSource, SkillsData } from "@/lib/types";
 import { SkillCard } from "./skill-card";
 import { Filters } from "./filters";
-import { Telescope } from "lucide-react";
 
 interface Props {
   data: SkillsData;
 }
+
+// Ordre d'affichage des sections : Perso en premier (ce sont tes skills),
+// puis Système (intégré Claude Code, rare), puis Plugins.
+const SOURCE_ORDER: SkillSource[] = ["perso", "system", "plugin"];
+
+const SOURCE_META: Record<
+  SkillSource,
+  { label: string; description: string; Icon: typeof User }
+> = {
+  perso: {
+    label: "Mes skills",
+    description: "Skills installés dans ~/.claude/skills et tes skills perso",
+    Icon: User,
+  },
+  system: {
+    label: "Skills système",
+    description: "Skills intégrés de Claude Code",
+    Icon: Sparkles,
+  },
+  plugin: {
+    label: "Skills de plugins",
+    description: "Skills fournis par les plugins Claude installés",
+    Icon: Package,
+  },
+};
 
 export function SkillGrid({ data }: Props) {
   const [query, setQuery] = useState("");
@@ -46,6 +70,18 @@ export function SkillGrid({ data }: Props) {
     });
   }, [data.skills, query, category, source, fuse]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<SkillSource, Skill[]>();
+    for (const s of filtered) {
+      if (!map.has(s.source)) map.set(s.source, []);
+      map.get(s.source)!.push(s);
+    }
+    return SOURCE_ORDER.filter((src) => map.has(src)).map((src) => ({
+      source: src,
+      skills: map.get(src)!,
+    }));
+  }, [filtered]);
+
   return (
     <>
       <Filters
@@ -64,32 +100,75 @@ export function SkillGrid({ data }: Props) {
         }}
       />
 
-      <section className="mx-auto max-w-7xl px-6 pb-24">
+      <section className="mx-auto max-w-7xl px-6 pb-24 space-y-12">
         {filtered.length === 0 ? (
           <EmptyState />
         ) : (
-          <motion.div
-            layout
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-          >
-            <AnimatePresence mode="popLayout">
-              {filtered.map((skill, i) => (
-                <motion.div
-                  key={skill.slug}
-                  layout
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.22 }}
-                >
-                  <SkillCard skill={skill} index={i} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          grouped.map(({ source: src, skills }) => (
+            <SourceSection
+              key={src}
+              source={src}
+              skills={skills}
+              totalForSource={
+                data.sources.find((s) => s.id === src)?.count ?? skills.length
+              }
+            />
+          ))
         )}
       </section>
     </>
+  );
+}
+
+function SourceSection({
+  source,
+  skills,
+  totalForSource,
+}: {
+  source: SkillSource;
+  skills: Skill[];
+  totalForSource: number;
+}) {
+  const meta = SOURCE_META[source];
+  const { Icon } = meta;
+  const showingAll = skills.length === totalForSource;
+
+  return (
+    <div>
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-[rgb(var(--border))] pb-3">
+        <div className="flex items-center gap-3">
+          <span
+            className={
+              source === "perso"
+                ? "inline-flex h-9 w-9 items-center justify-center rounded-xl bg-terracotta-500 text-white shadow-sm"
+                : "inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[rgb(var(--border))]/60 text-[rgb(var(--fg))]"
+            }
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="font-serif text-xl font-medium leading-tight">
+              {meta.label}
+            </h2>
+            <p className="text-xs muted-text mt-0.5">{meta.description}</p>
+          </div>
+        </div>
+        <span className="text-xs muted-text">
+          <span className="font-semibold text-[rgb(var(--fg))]">
+            {skills.length}
+          </span>
+          {showingAll
+            ? ` skill${skills.length > 1 ? "s" : ""}`
+            : ` / ${totalForSource}`}
+        </span>
+      </header>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {skills.map((skill, i) => (
+          <SkillCard key={skill.slug} skill={skill} index={i} />
+        ))}
+      </div>
+    </div>
   );
 }
 

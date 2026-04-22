@@ -1,15 +1,34 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowUpRight, Clipboard, Check, FileText, Package, Sparkles, User } from "lucide-react";
 import { useState } from "react";
 import type { Skill } from "@/lib/types";
 import { getCategory } from "@/lib/categories";
+import { daysSince, formatRelativeDays } from "@/lib/utils";
 
 interface Props {
   skill: Skill;
   index?: number;
+}
+
+// Un skill est considéré "récent" s'il a été modifié il y a moins de 7 jours.
+const RECENT_THRESHOLD_DAYS = 7;
+
+function RecentBadge({ days }: { days: number }) {
+  const label = formatRelativeDays(days);
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium"
+      title={`Modifié ${label}`}
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      </span>
+      Récent
+    </span>
+  );
 }
 
 function SourceBadge({ source }: { source: Skill["source"] }) {
@@ -37,9 +56,15 @@ function SourceBadge({ source }: { source: Skill["source"] }) {
   );
 }
 
-export function SkillCard({ skill, index = 0 }: Props) {
+export function SkillCard({ skill }: Props) {
   const category = getCategory(skill.category);
   const [copied, setCopied] = useState(false);
+  const ageDays = daysSince(skill.lastModified);
+  // On n'affiche la pastille "Récent" que pour les skills perso : pour les
+  // plugins, la date de modification reflète la date de sync Claude Code et
+  // non la vraie date de mise à jour du skill → trop de faux positifs.
+  const isRecent =
+    skill.source === "perso" && ageDays <= RECENT_THRESHOLD_DAYS;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -54,10 +79,7 @@ export function SkillCard({ skill, index = 0 }: Props) {
   };
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.02, 0.4) }}
+    <article
       className="group relative flex flex-col h-full surface rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 hover:border-terracotta-300"
     >
       {/* Liseré coloré en haut */}
@@ -78,6 +100,7 @@ export function SkillCard({ skill, index = 0 }: Props) {
             {category.label}
           </span>
           <SourceBadge source={skill.source} />
+          {isRecent && <RecentBadge days={ageDays} />}
         </div>
       </div>
 
@@ -145,6 +168,6 @@ export function SkillCard({ skill, index = 0 }: Props) {
           </a>
         )}
       </div>
-    </motion.article>
+    </article>
   );
 }
