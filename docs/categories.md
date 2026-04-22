@@ -137,3 +137,25 @@ Ne jamais garder un id de catégorie "fantôme" dans les overrides : le scanner 
 ## Effet de bord sur le scan
 
 Changer `lib/categories.ts` ne regénère pas automatiquement `data/skills.json`. Il faut relancer `npm run scan` pour que les nouvelles catégories soient appliquées. Les filtres de la homepage sont calculés à partir du JSON, pas à partir du code.
+
+## Workflow de publication pour un changement de catégories
+
+Attention : `npm run ship` **ne couvre pas** les modifications de `lib/categories.ts`. Le script ne committe que `data/skills.json` et refuse de partir s'il détecte d'autres changements non-committés.
+
+Pour publier une modification de catégories, le workflow manuel est :
+
+```bash
+# 1. Modifier lib/categories.ts (ajout / override / couleur / keywords)
+# 2. Régénérer skills.json avec la nouvelle classification
+npm run scan -- --input ~/.claude/skills --input ~/.claude/plugins
+
+# 3. Vérifier en local
+npm run dev  # ou npm run build
+
+# 4. Commit + push des DEUX fichiers ensemble
+git add lib/categories.ts data/skills.json
+git commit -m "update: nouvelle catégorie X / override skill Y"
+git push
+```
+
+C'est fait séparément parce qu'une modification de catégories est une opération éditoriale (choix humain : quelle couleur, quels mots-clés, quel nom) et n'a pas à être enchaînée automatiquement avec un simple ajout de skill.

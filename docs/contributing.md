@@ -37,6 +37,22 @@ npm run lint
 npm run scan -- --input ~/.claude/skills --input ~/.claude/plugins
 ```
 
+### Publier une mise à jour
+
+Quand tu as modifié des SKILL.md dans `~/.claude/skills/` ou `~/.claude/plugins/` et que tu veux mettre à jour le site en prod, le raccourci est :
+
+```bash
+# Message de commit auto-généré (ajouts/modifs/retraits détectés)
+npm run ship
+
+# Message custom si tu veux enrichir le contexte
+npm run ship -- "add: skill X pour ticket INGEST-1234"
+```
+
+Le script enchaîne scan + build + audit + commit + push. Aucune action manuelle ensuite : Vercel rebuild et déploie en 1 à 2 minutes. Voir [deployment.md → Raccourci npm run ship](deployment.md#raccourci--npm-run-ship) pour le détail.
+
+Pour des modifications autres (composants, catégories, doc), reste sur le workflow Git manuel — `ship` ne committe que `data/skills.json`.
+
 ### Règle importante : ne pas mélanger `npm run build` et `npm run dev`
 
 Les deux commandes écrivent dans `.next/` avec des artefacts incompatibles. Lancer un `build` pendant qu'un `dev` tourne corrompt les chunks webpack et casse le serveur de dev (erreur `Cannot find module './213.js'`, CSS en 404).
@@ -169,21 +185,29 @@ tags: [Tag1, Tag2]
 # Contenu Markdown complet du skill
 ```
 
-Puis :
+Puis pour voir le résultat en local :
 
 ```bash
 npm run scan:default
+npm run dev
 ```
 
-### Option 2 : via `~/.claude/skills/`
+### Option 2 : via `~/.claude/skills/` (recommandé pour le quotidien)
 
 Déposer le dossier dans `~/.claude/skills/mon-super-skill/` puis :
 
 ```bash
-npm run scan -- --input ~/.claude/skills
+npm run ship
 ```
 
-Le skill sera automatiquement détecté comme perso (via le marker `.claude/skills` dans `PERSO_MARKERS`).
+Le skill sera automatiquement détecté comme perso (via le marker `.claude/skills` dans `PERSO_MARKERS`), et `npm run ship` :
+
+- lance le scan
+- détecte le nouveau skill (ADDED)
+- génère un message de commit `add: mon-super-skill`
+- push → Vercel redéploie
+
+Tu n'as **rien d'autre à faire**. Le site en prod est à jour en 1 à 2 minutes.
 
 ## Modifier le scanner
 

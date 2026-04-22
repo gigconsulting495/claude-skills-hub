@@ -204,3 +204,31 @@ Attention : un plugin qui aurait par hasard un dossier avec ce nom serait mal cl
 - Le fichier `data/skills.json` est **toujours** committé dans Git : Vercel en a besoin au build et n'a pas accès à ton filesystem local.
 - Les slugs sont **stables** : tant qu'un skill ne change pas de source/plugin/name, son slug (et donc son URL) reste identique entre deux scans.
 - Le scanner est **idempotent** : deux runs successifs sur les mêmes dossiers produisent un JSON identique (au `generatedAt` près).
+
+## Intégration avec `npm run ship`
+
+Le scanner est rarement lancé seul en pratique : il est appelé par [`scripts/ship.sh`](../scripts/ship.sh) (alias `npm run ship`) qui enchaîne scan → diff sémantique → build → audit → commit → push.
+
+### Quand utiliser `npm run scan` directement
+
+- Quand tu veux juste régénérer `data/skills.json` **sans** publier (par exemple pour vérifier localement qu'un nouveau skill est bien détecté)
+- Quand tu dois scanner des dossiers non-standards (ex. un dossier `my-skills` temporaire)
+- Quand tu veux passer `--verbose` pour déboguer un SKILL.md mal formé
+
+### Quand utiliser `npm run ship`
+
+- Pour **publier** une mise à jour du catalogue en prod en une commande
+- Le script ne committe que `data/skills.json` : si tu as aussi modifié `lib/categories.ts` ou du code, il refusera de partir tant que ces changements ne sont pas committés séparément
+
+### Différence clé
+
+| Aspect | `npm run scan` | `npm run ship` |
+| --- | --- | --- |
+| Régénère `data/skills.json` | oui | oui (en appelant scan) |
+| Filtre les changements superficiels | non (toujours change `generatedAt`) | oui (ignore `generatedAt` et `lastModified` par skill) |
+| Lance `npm run build` | non | oui (en sécurité) |
+| Lance `npm audit` | non | oui (bloque si CVE critique) |
+| Commit + push | non | oui (avec message auto ou fourni) |
+| Sortie si rien n'a changé | écrit quand même le JSON | sort avec "Rien à publier" sans polluer Git |
+
+Voir [deployment.md → Raccourci npm run ship](deployment.md#raccourci--npm-run-ship) pour la référence complète du workflow.

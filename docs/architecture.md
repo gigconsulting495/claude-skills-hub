@@ -70,7 +70,8 @@ claude-skills-hub/
 │   ├── categories.ts           # CATEGORIES, CATEGORY_OVERRIDES, TAG_OVERRIDES
 │   └── utils.ts                # cn, slugify, daysSince, formatRelativeDays
 ├── scripts/
-│   └── scan-skills.ts          # CLI qui génère data/skills.json
+│   ├── scan-skills.ts          # CLI qui génère data/skills.json
+│   └── ship.sh                 # Workflow de publication (scan + build + commit + push)
 ├── data/
 │   └── skills.json             # Données produites par le scan (committé)
 ├── docs/                       # Cette documentation
@@ -114,8 +115,23 @@ Voir [scanner-cli.md](scanner-cli.md) pour le détail.
 
 - La homepage sert une grille de cartes déjà rendue côté serveur
 - Le client React hydrate les composants interactifs (filtres, recherche, thème)
-- La recherche se fait **entièrement côté client** via Fuse.js sur les 40 skills
+- La recherche se fait **entièrement côté client** via Fuse.js sur les skills
 - Chaque page détail est un fichier HTML statique indépendant
+
+### 4. Publication (workflow quotidien)
+
+Le script `scripts/ship.sh` (alias `npm run ship`) encapsule la boucle de publication :
+
+```
+Skills modifiés localement  →  npm run ship  →  scan  →  diff sémantique  →  build  →  audit  →  commit  →  push
+                                                                                                              │
+                                                                                                              ▼
+                                                                                                   Vercel build & deploy
+```
+
+Le script détecte automatiquement les skills ajoutés, retirés et modifiés en comparant l'ancien et le nouveau `data/skills.json` (en ignorant `lastModified` qui peut bouger sans vrai changement de contenu). Il génère un message de commit adapté au type et au nombre de changements.
+
+Voir [scanner-cli.md](scanner-cli.md#intégration-avec-npm-run-ship) et [deployment.md](deployment.md#raccourci--npm-run-ship) pour le détail.
 
 ## Choix techniques notables
 

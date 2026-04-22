@@ -2,6 +2,8 @@
 
 Le site est déployé sur **Vercel** à partir du repo GitHub `gigconsulting495/claude-skills-hub`, branche `main`. Il est exposé sur `https://skills.gig-consulting.com` via un CNAME configuré chez one.com.
 
+> **État actuel** : le site est en ligne, le certificat HTTPS est provisionné, le CNAME `skills` chez one.com pointe vers `<hash>.vercel-dns-017.com.` (valeur unique par projet Vercel). Chaque push sur `main` déclenche un redéploiement automatique en 1 à 2 minutes. Les sections "Premier déploiement" et "Configurer le sous-domaine" ci-dessous servent de référence si un jour il faut refaire l'ops (changement de domaine, repo, etc.).
+
 ## Vue d'ensemble
 
 ```
