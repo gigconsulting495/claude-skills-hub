@@ -131,6 +131,68 @@ Vercel build et déploie le commit de revert en 1 à 2 minutes.
 
 Aucune variable n'est requise à ce jour. Si une future fonctionnalité nécessite un secret (ex. analytics externe), l'ajouter dans **Settings → Environment Variables** sur Vercel. Ne jamais commiter de `.env` dans le repo : le `.gitignore` l'exclut déjà.
 
+## Mise à jour des dépendances (sécurité)
+
+Vercel applique une politique qui **bloque le déploiement si Next.js est dans une version affectée par une CVE critique**, même si le build réussit. Le symptôme :
+
+- Les logs de build affichent `✓ Compiled successfully` et `Build Completed`
+- Le déploiement est marqué **"Deployment failed with error"**
+- La fin des logs contient `Vulnerable version of Next.js detected, please update immediately.`
+
+### Vérifier les vulnérabilités en local
+
+Avant chaque push important, et au moins une fois par mois :
+
+```bash
+npm audit
+```
+
+Si une vulnérabilité critique ou haute sur `next` apparaît, il faut upgrader avant que Vercel ne refuse un deploy.
+
+### Upgrader Next.js sans breaking change
+
+Pour rester sur la même majeure (ici 15.x) et minimiser les risques :
+
+```bash
+# Prendre la dernière stable 15.x
+npm install next@^15 eslint-config-next@^15 --save
+
+# Vérifier que tout compile
+rm -rf .next
+npm run build
+
+# Si OK, commit
+git add package.json package-lock.json next-env.d.ts
+git commit -m "chore: upgrade Next.js → <version> (patch CVE-XXXX-YYYYY)"
+git push
+```
+
+`next-env.d.ts` est parfois régénéré automatiquement par Next.js lors d'un upgrade mineur : il faut l'inclure dans le commit.
+
+### Monter de majeure (ex. 15.x → 16.x)
+
+À faire uniquement si la sécurité l'exige ou pour bénéficier de nouvelles features. Checklist :
+
+1. Lire le [guide de migration Next.js](https://nextjs.org/docs/app/building-your-application/upgrading) pour la majeure ciblée
+2. Vérifier les breaking changes sur l'App Router et sur `generateStaticParams`
+3. Upgrader dans une branche dédiée (`chore/next-16`)
+4. Tester `npm run build` puis `npm run dev`
+5. Vérifier les pages critiques (homepage + 3 pages détail)
+6. Merger seulement si tout passe
+
+Pour ce projet (App Router statique sans middleware ni Server Actions), les montées de majeure sont généralement sans douleur.
+
+### Audit régulier
+
+Tous les 1 à 2 mois, relancer :
+
+```bash
+npm outdated
+npm audit
+```
+
+Et traiter les deux colonnes `Current` vs `Latest` pour les dépendances directes. Les transitives sont gérées par `npm audit fix`.
+
 ## Coûts
 
 - Plan Vercel **Hobby** : gratuit pour ce projet (0 Function, 0 Bandwidth au-delà du quota Hobby de 100 GB/mois, 0 build time critique)
@@ -148,6 +210,10 @@ Causes typiques :
 - Différence de version Node : vérifier `Settings → General → Node.js Version` sur Vercel (mettre 20 ou plus récent)
 - Fichier non committé : vérifier que `data/skills.json` est bien dans Git (`git ls-files data/`)
 - Typage TypeScript cassé par une dépendance : `npm ci && npm run build` local pour reproduire
+
+### "Deployment failed with error" alors que le build est vert
+
+Si les logs montrent `✓ Compiled successfully` puis `Vulnerable version of Next.js detected` à la fin, Vercel bloque le déploiement pour raison de sécurité. Voir la section [Mise à jour des dépendances](#mise-à-jour-des-dépendances-sécurité) ci-dessus : upgrader Next.js vers une version patchée, commiter et pousser.
 
 ### `skills.gig-consulting.com` ne résout pas après 1h
 

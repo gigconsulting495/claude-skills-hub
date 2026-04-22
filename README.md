@@ -8,7 +8,7 @@ Déployé publiquement sur `skills.gig-consulting.com` via Vercel.
 
 ## Stack technique
 
-- Next.js 15.1 (App Router, génération statique)
+- Next.js 15.5 (App Router, génération statique)
 - React 19 + TypeScript 5.7
 - Tailwind CSS 3.4 avec palette custom (crème `#F0EEE6` + terracotta `#CC785C`)
 - Framer Motion (animations), Fuse.js (recherche floue)

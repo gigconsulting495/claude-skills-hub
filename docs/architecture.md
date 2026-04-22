@@ -32,7 +32,7 @@ Aucune base de données, aucune API runtime : toutes les pages sont pré-rendues
 
 | Couche | Technologie | Rôle |
 | --- | --- | --- |
-| Framework | Next.js 15.1 (App Router) | Routing, SSG, chargement des polices |
+| Framework | Next.js 15.5 (App Router) | Routing, SSG, chargement des polices |
 | UI | React 19 | Rendu des composants |
 | Typage | TypeScript 5.7 | Types partagés `Skill`, `SkillsData`, etc. |
 | Styling | Tailwind CSS 3.4 | Utility-first, palette custom terracotta/crème |

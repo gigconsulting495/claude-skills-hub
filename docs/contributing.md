@@ -56,6 +56,7 @@ Avant chaque `git push` :
 
 - [ ] `npm run lint` passe sans erreur
 - [ ] `npm run build` passe sans erreur ni warning de typage
+- [ ] `npm audit` ne rapporte pas de vulnérabilité critique sur `next` (sinon Vercel refusera le deploy)
 - [ ] Le serveur de dev affiche correctement la homepage et au moins une page détail
 - [ ] `data/skills.json` est committé si modifié (ne jamais laisser l'ancien JSON après un scan)
 - [ ] Aucune clé API, token personnel ou chemin absolu sensible dans le diff
@@ -63,8 +64,10 @@ Avant chaque `git push` :
 Commande combinée :
 
 ```bash
-npm run lint && npm run build
+npm run lint && npm run build && npm audit
 ```
+
+Pour la procédure d'upgrade quand `npm audit` signale une CVE sur Next.js, voir [deployment.md → Mise à jour des dépendances](deployment.md#mise-à-jour-des-dépendances-sécurité).
 
 ## Conventions de code
 
