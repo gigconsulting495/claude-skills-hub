@@ -1,8 +1,10 @@
 # Claude Skills Hub
 
+[![Live](https://img.shields.io/badge/live-skills.gig--consulting.com-CC785C?style=flat-square)](https://skills.gig-consulting.com) [![Next.js](https://img.shields.io/badge/Next.js-15.5-000?style=flat-square)](https://nextjs.org) [![Deployed on Vercel](https://img.shields.io/badge/deployed%20on-Vercel-000?style=flat-square)](https://vercel.com)
+
 Catalogue visuel des skills Claude (système, plugins et skills perso) exposé sous forme d'un site Next.js statique avec filtres par catégorie, filtres par source, recherche floue et rendu Markdown complet du `SKILL.md`.
 
-Déployé publiquement sur `skills.gig-consulting.com` via Vercel.
+Site en ligne : **[skills.gig-consulting.com](https://skills.gig-consulting.com)**. Chaque push sur `main` déclenche un redéploiement Vercel automatique.
 
 > Pour la doc technique détaillée (architecture, scanner CLI, composants, déploiement, contribution), voir [docs/README.md](docs/README.md).
 
