@@ -81,22 +81,51 @@ Une fois la propagation confirmée, revenir sur Vercel → Settings → Domains 
 
 ### Raccourci : `npm run ship`
 
-Pour les mises à jour courantes (ajout/modif de skills), un seul script enchaîne tout :
+Pour les mises à jour courantes (ajout/modif de skills), un seul script enchaîne tout, et **détecte automatiquement** ce qui a changé pour générer un message de commit intelligent :
 
 ```bash
-npm run ship -- "add: nouveau skill mermaid-diagram"
+# Le plus simple : message auto-généré
+npm run ship
+
+# Message forcé (si tu veux un libellé précis)
+npm run ship -- "add: skill mermaid-diagram pour les schémas"
 ```
 
 Ce que ça fait :
 
 1. Vérifie que tu es sur `main` sans changements non-committés hors `data/skills.json`
-2. Lance `npm run scan` avec les dossiers par défaut
-3. Détecte s'il y a un vrai changement (ignore `generatedAt` qui change à chaque scan)
-4. Lance `npm run build` pour s'assurer que rien n'est cassé
-5. Lance `npm audit --audit-level=critical` pour bloquer les CVE critiques
-6. Commit `data/skills.json` avec le message fourni et push
+2. Lance `npm run scan` sur `~/.claude/skills` et `~/.claude/plugins`
+3. Compare l'ancien et le nouveau `data/skills.json` pour détecter :
+   - Les skills **ajoutés** (slugs nouveaux)
+   - Les skills **retirés** (slugs disparus)
+   - Les skills **modifiés** (contenu réellement différent, hors `lastModified`)
+4. Si aucun changement réel, sort avec `Rien à publier` et restaure le JSON
+5. Génère un message de commit automatique sauf si tu en fournis un
+6. Lance `npm run build` et `npm audit --audit-level=critical`
+7. Commit `data/skills.json` et push
 
-Si aucun changement réel n'est détecté (par exemple tu relances par réflexe), le script sort proprement avec `Rien à publier`. Si un check échoue (build, audit, working tree sale), aucun commit n'est créé.
+### Exemples de messages auto-générés
+
+Le script adapte le message selon le nombre et le type de changements :
+
+| Changement | Message généré |
+| --- | --- |
+| 1 skill ajouté | `add: banner-design` |
+| 3 skills ajoutés | `add: skill-a, skill-b, skill-c` |
+| 7 skills ajoutés | `add: skill-a, skill-b, skill-c, skill-d, skill-e et 2 autre(s)` |
+| 1 skill modifié | `update: humanizer` |
+| 1 skill retiré | `remove: old-skill` |
+| Mix (2 ajouts + 1 modif + 1 retrait) | `update: 4 skill(s) — +2 ajout(s), ~1 modif(s), -1 retrait(s)` |
+
+Tu peux toujours forcer un message personnalisé si besoin (changelog plus descriptif, référence à un ticket, etc.) :
+
+```bash
+npm run ship -- "add: nouveau skill mermaid pour INGEST-1234"
+```
+
+### Comportement sur erreur
+
+Si un check échoue (build KO, audit critique, working tree sale, push refusé), **aucun commit n'est créé** et le working tree reste dans son état initial. Les logs sont dans `/tmp/ship-*.log`.
 
 ### Workflow manuel (pour modifs de code)
 
