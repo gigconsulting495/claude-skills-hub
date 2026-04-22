@@ -32,6 +32,7 @@ npm install
 | `npm run build`             | Compile une version statique optimisée dans `.next/`                                 |
 | `npm run start`             | Lance la version buildée (équivalent à ce que Vercel sert en prod)                   |
 | `npm run lint`              | Lint ESLint avec la config Next.js                                                   |
+| `npm run ship -- "msg"`     | Scan + build + audit + commit + push en une commande (voir [docs/deployment.md](docs/deployment.md)) |
 
 ### Exemple de scan ciblé
 

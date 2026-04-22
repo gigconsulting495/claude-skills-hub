@@ -79,21 +79,49 @@ Une fois la propagation confirmée, revenir sur Vercel → Settings → Domains 
 
 ## Workflow de mise à jour
 
+### Raccourci : `npm run ship`
+
+Pour les mises à jour courantes (ajout/modif de skills), un seul script enchaîne tout :
+
 ```bash
-# 1. Ajouter ou modifier des SKILL.md dans ~/.claude/skills ou ~/.claude/plugins
-# 2. Relancer le scan
+npm run ship -- "add: nouveau skill mermaid-diagram"
+```
+
+Ce que ça fait :
+
+1. Vérifie que tu es sur `main` sans changements non-committés hors `data/skills.json`
+2. Lance `npm run scan` avec les dossiers par défaut
+3. Détecte s'il y a un vrai changement (ignore `generatedAt` qui change à chaque scan)
+4. Lance `npm run build` pour s'assurer que rien n'est cassé
+5. Lance `npm audit --audit-level=critical` pour bloquer les CVE critiques
+6. Commit `data/skills.json` avec le message fourni et push
+
+Si aucun changement réel n'est détecté (par exemple tu relances par réflexe), le script sort proprement avec `Rien à publier`. Si un check échoue (build, audit, working tree sale), aucun commit n'est créé.
+
+### Workflow manuel (pour modifs de code)
+
+Quand tu modifies autre chose que `data/skills.json` (composants, catégories, doc), le workflow reste classique :
+
+```bash
+# 1. Ajouter/modifier le code
+# 2. Si tu as aussi touché à des SKILL.md → re-scanner
 npm run scan -- --input ~/.claude/skills --input ~/.claude/plugins
 
 # 3. Vérifier que rien n'est cassé en local
 npm run build
+npm audit
 
 # 4. Commit + push
-git add data/skills.json lib/categories.ts
+git add .
 git commit -m "update: description du changement"
 git push
 ```
 
 Vercel redéploie automatiquement sur chaque push `main`. Pas d'étape manuelle.
+
+### Automatisation complémentaire
+
+Pour aller plus loin, `npm run ship` peut être wrappé dans une tâche `launchd` (macOS) ou `cron` qui le lance quotidiennement avec un message auto-généré. Pas mis en place aujourd'hui car ça sacrifie le contrôle sur le timing et les messages de commit.
 
 ## Conventions de commit pour les mises à jour
 
