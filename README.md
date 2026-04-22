@@ -4,6 +4,8 @@ Catalogue visuel des skills Claude (système, plugins et skills perso) exposé s
 
 Déployé publiquement sur `skills.gig-consulting.com` via Vercel.
 
+> Pour la doc technique détaillée (architecture, scanner CLI, composants, déploiement, contribution), voir [docs/README.md](docs/README.md).
+
 ## Stack technique
 
 - Next.js 15.1 (App Router, génération statique)
