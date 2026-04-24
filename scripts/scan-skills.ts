@@ -262,7 +262,7 @@ function loadMarketplaceIndex(): MarketplaceIndex {
       const isGithub = entry.source?.source === "github" && entry.source?.repo;
       map.set(name, {
         repoUrl: isGithub ? `https://github.com/${entry.source!.repo}` : undefined,
-        autoUpdate: entry.autoUpdate === true,
+        autoUpdate: entry.autoUpdate !== false,
       });
     }
     return { get: (name) => map.get(name) };
