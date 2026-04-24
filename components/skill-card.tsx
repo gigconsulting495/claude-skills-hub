@@ -1,9 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Clipboard, Check, FileText, Package, Sparkles, User } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  Clipboard,
+  FileText,
+  Lock,
+  Package,
+  RefreshCw,
+  Sparkles,
+  User,
+  Zap,
+} from "lucide-react";
 import { useState } from "react";
-import type { Skill } from "@/lib/types";
+import type { Skill, UpdateMode } from "@/lib/types";
 import { getCategory } from "@/lib/categories";
 import { daysSince, formatRelativeDays } from "@/lib/utils";
 
@@ -29,6 +40,57 @@ function RecentBadge({ days }: { days: number }) {
       Récent
     </span>
   );
+}
+
+function UpdateModeBadge({ mode, title }: { mode: UpdateMode; title: string }) {
+  if (mode === "auto") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium"
+        title={title}
+      >
+        <Zap className="h-3 w-3" />
+        Auto
+      </span>
+    );
+  }
+  if (mode === "manual") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[11px] font-medium"
+        title={title}
+      >
+        <RefreshCw className="h-3 w-3" />
+        Manuel
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--border))]/60 muted-text px-2 py-0.5 text-[11px] font-medium"
+      title={title}
+    >
+      <Lock className="h-3 w-3" />
+      Local
+    </span>
+  );
+}
+
+function updateModeTooltip(skill: Skill): string {
+  switch (skill.updateMode) {
+    case "auto":
+      if (skill.source === "system") {
+        return "Auto — mis à jour avec Claude Code";
+      }
+      return `Auto — le marketplace ${skill.marketplace?.name ?? ""} est en auto-update`;
+    case "manual":
+      if (skill.source === "plugin") {
+        return `Manuel — lance /plugin marketplace update ${skill.marketplace?.name ?? ""}`;
+      }
+      return "Manuel — skill perso avec une source amont, à puller à la main";
+    case "local":
+      return "Local — aucune source amont, modifications uniquement locales";
+  }
 }
 
 function SourceBadge({ source }: { source: Skill["source"] }) {
@@ -100,6 +162,10 @@ export function SkillCard({ skill }: Props) {
             {category.label}
           </span>
           <SourceBadge source={skill.source} />
+          <UpdateModeBadge
+            mode={skill.updateMode}
+            title={updateModeTooltip(skill)}
+          />
           {isRecent && <RecentBadge days={ageDays} />}
         </div>
       </div>

@@ -21,7 +21,14 @@ import {
   detectCategory,
   detectTags,
 } from "../lib/categories.js";
-import type { Skill, SkillsData, SkillSource, SkillPlugin } from "../lib/types.js";
+import type {
+  Skill,
+  SkillsData,
+  SkillSource,
+  SkillPlugin,
+  SkillMarketplace,
+  UpdateMode,
+} from "../lib/types.js";
 import { slugify } from "../lib/utils.js";
 
 // ------------------------------------------------------------------
@@ -40,6 +47,13 @@ const DEFAULT_INPUTS = [
 ];
 
 const DEFAULT_OUTPUT = path.join(process.cwd(), "data", "skills.json");
+
+// Note sécurité — le frontmatter brut n'est PAS sérialisé dans le JSON public.
+// Seuls les champs lus explicitement ci-dessous (name, description, tags, url,
+// repo) traversent la frontière scanner → JSON. Pour ajouter un champ à la
+// sortie publique, il faut (1) l'ajouter au type Skill dans lib/types.ts et
+// (2) le lire explicitement dans buildSkill(). Cette discipline remplace une
+// allowlist runtime par une garantie portée par le système de types.
 
 // Marqueurs qui identifient l'emplacement d'un skill perso.
 // Si le chemin contient un de ces segments, le skill est marqué "perso".
@@ -125,6 +139,7 @@ function prettyPath(abs: string): string {
 function detectSource(skillPath: string): {
   source: SkillSource;
   plugin?: SkillPlugin;
+  marketplaceName?: string;
 } {
   const norm = skillPath.replace(/\\/g, "/");
 
@@ -132,7 +147,11 @@ function detectSource(skillPath: string): {
   //    pour éviter qu'un plugin imbriquant `.claude/skills` soit mal classé).
   const pluginInfo = findPluginManifest(skillPath);
   if (pluginInfo) {
-    return { source: "plugin", plugin: pluginInfo };
+    return {
+      source: "plugin",
+      plugin: pluginInfo,
+      marketplaceName: findMarketplaceName(norm),
+    };
   }
 
   // 2. Plugin sans manifest : chemin contient `.claude/plugins/…/<plugin>/…`.
@@ -140,7 +159,11 @@ function detectSource(skillPath: string): {
   //    clairement des plugins — on les détecte via leur emplacement.
   const pluginFromPath = findPluginFromPath(norm);
   if (pluginFromPath) {
-    return { source: "plugin", plugin: pluginFromPath };
+    return {
+      source: "plugin",
+      plugin: pluginFromPath,
+      marketplaceName: findMarketplaceName(norm),
+    };
   }
 
   // 3. Skill perso : chemin contient un marker perso
@@ -162,6 +185,20 @@ function findPluginFromPath(normalizedPath: string): SkillPlugin | undefined {
   const pluginSegment = match[1].split("/").pop();
   if (!pluginSegment) return undefined;
   return { name: pluginSegment };
+}
+
+/**
+ * Extrait le nom du marketplace depuis un chemin de skill installé via plugin.
+ * Structure observée :
+ *   ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/<skill>/SKILL.md
+ *   ~/.claude/plugins/marketplaces/<marketplace>/plugins/<plugin>/skills/<skill>/SKILL.md
+ */
+function findMarketplaceName(normalizedPath: string): string | undefined {
+  const cacheMatch = normalizedPath.match(/\/plugins\/cache\/([^/]+)\//);
+  if (cacheMatch) return cacheMatch[1];
+  const mktMatch = normalizedPath.match(/\/plugins\/marketplaces\/([^/]+)\//);
+  if (mktMatch) return mktMatch[1];
+  return undefined;
 }
 
 function findPluginManifest(startPath: string): SkillPlugin | undefined {
@@ -199,9 +236,49 @@ function findPluginManifest(startPath: string): SkillPlugin | undefined {
   return undefined;
 }
 
+/**
+ * Index des marketplaces connus : nom → (repoUrl ?, autoUpdate).
+ * Construit depuis `~/.claude/plugins/known_marketplaces.json`.
+ */
+interface MarketplaceIndex {
+  get(name: string): { repoUrl?: string; autoUpdate: boolean } | undefined;
+}
+
+function loadMarketplaceIndex(): MarketplaceIndex {
+  const file = path.join(HOME, ".claude", "plugins", "known_marketplaces.json");
+  const fallback: MarketplaceIndex = { get: () => undefined };
+  if (!fs.existsSync(file)) return fallback;
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as Record<
+      string,
+      {
+        source?: { source?: string; repo?: string };
+        autoUpdate?: boolean;
+      }
+    >;
+    const map = new Map<string, { repoUrl?: string; autoUpdate: boolean }>();
+    for (const [name, entry] of Object.entries(raw)) {
+      const isGithub = entry.source?.source === "github" && entry.source?.repo;
+      map.set(name, {
+        repoUrl: isGithub ? `https://github.com/${entry.source!.repo}` : undefined,
+        autoUpdate: entry.autoUpdate === true,
+      });
+    }
+    return { get: (name) => map.get(name) };
+  } catch {
+    return fallback;
+  }
+}
+
 interface RawSkill {
   filePath: string;
   raw: string;
+}
+
+/** Version interne de Skill qui conserve le chemin absolu pour la dédup. */
+interface ScannedSkill extends Skill {
+  _absolutePath: string;
 }
 
 // Dossiers à ignorer lors du scan récursif.
@@ -246,7 +323,10 @@ function findSkillFiles(rootDir: string, acc: RawSkill[] = []): RawSkill[] {
   return acc;
 }
 
-function buildSkill(raw: RawSkill): Skill | undefined {
+function buildSkill(
+  raw: RawSkill,
+  marketplaces: MarketplaceIndex,
+): ScannedSkill | undefined {
   const parsed = matter(raw.raw);
   const fm = parsed.data as Record<string, unknown>;
   const rawName = (fm.name as string) ?? path.basename(path.dirname(raw.filePath));
@@ -260,7 +340,7 @@ function buildSkill(raw: RawSkill): Skill | undefined {
   if (!name || !description) return undefined;
 
   const skillDir = path.dirname(raw.filePath);
-  const { source, plugin } = detectSource(skillDir);
+  const { source, plugin, marketplaceName } = detectSource(skillDir);
 
   const category = detectCategory(name, description);
   const frontmatterTags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
@@ -273,6 +353,22 @@ function buildSkill(raw: RawSkill): Skill | undefined {
   const slugParts = [source, plugin?.name, name].filter(Boolean) as string[];
   const slug = slugify(slugParts.join("-"));
 
+  // Marketplace et URL externe
+  const mktInfo = marketplaceName ? marketplaces.get(marketplaceName) : undefined;
+  const marketplace: SkillMarketplace | undefined = marketplaceName
+    ? { name: marketplaceName, autoUpdate: mktInfo?.autoUpdate ?? false }
+    : undefined;
+
+  const frontmatterUrl = (fm.url as string) ?? (fm.repo as string) ?? undefined;
+  // Pour un plugin on privilégie le repo du marketplace (source fiable) ;
+  // pour un skill perso, on prend ce qui est déclaré dans le frontmatter.
+  const externalUrl =
+    source === "plugin"
+      ? mktInfo?.repoUrl ?? frontmatterUrl
+      : frontmatterUrl;
+
+  const updateMode = computeUpdateMode(source, marketplace, frontmatterUrl);
+
   return {
     slug,
     name,
@@ -281,13 +377,27 @@ function buildSkill(raw: RawSkill): Skill | undefined {
     tags,
     source,
     plugin,
-    path: skillDir,
+    marketplace,
+    updateMode,
     displayPath: prettyPath(skillDir),
     content: parsed.content.trim(),
-    frontmatter: fm,
     lastModified: stat.mtime.toISOString(),
-    externalUrl: (fm.url as string) ?? (fm.repo as string) ?? undefined,
+    externalUrl,
+    _absolutePath: skillDir,
   };
+}
+
+function computeUpdateMode(
+  source: SkillSource,
+  marketplace: SkillMarketplace | undefined,
+  frontmatterUrl: string | undefined,
+): UpdateMode {
+  if (source === "system") return "auto";
+  if (source === "plugin") {
+    return marketplace?.autoUpdate ? "auto" : "manual";
+  }
+  // Perso : manuel si une source amont est déclarée, sinon purement local.
+  return frontmatterUrl ? "manual" : "local";
 }
 
 function aggregate(skills: Skill[]): Omit<SkillsData, "generatedAt" | "scannedPaths" | "skills"> {
@@ -373,10 +483,12 @@ function main() {
     );
   }
 
+  const marketplaces = loadMarketplaceIndex();
+
   const built = rawSkills
     .map((r) => {
       try {
-        return buildSkill(r);
+        return buildSkill(r, marketplaces);
       } catch (err) {
         if (args.verbose) {
           console.error(`  [warn] ${r.filePath} :`, err);
@@ -384,30 +496,35 @@ function main() {
         return undefined;
       }
     })
-    .filter((s): s is Skill => Boolean(s));
+    .filter((s): s is ScannedSkill => Boolean(s));
 
   // Déduplication par slug : si deux skills produisent le même slug (ex. un
   // plugin présent à la fois dans plusieurs marketplaces), on garde celui
   // dont le chemin est le plus "stable" (hors cache/, le plus récent sinon).
-  const bySlug = new Map<string, Skill>();
+  const bySlug = new Map<string, ScannedSkill>();
   for (const skill of built) {
     const existing = bySlug.get(skill.slug);
     if (!existing) {
       bySlug.set(skill.slug, skill);
       continue;
     }
-    const existingScore = scoreSkillPath(existing.path);
-    const newScore = scoreSkillPath(skill.path);
+    const existingScore = scoreSkillPath(existing._absolutePath);
+    const newScore = scoreSkillPath(skill._absolutePath);
     if (newScore > existingScore) {
       bySlug.set(skill.slug, skill);
     }
   }
-  const skills = Array.from(bySlug.values()).sort((a, b) => {
-    // Perso d'abord, puis par nom
-    if (a.source === "perso" && b.source !== "perso") return -1;
-    if (b.source === "perso" && a.source !== "perso") return 1;
-    return a.name.localeCompare(b.name);
-  });
+
+  // On strippe `_absolutePath` (chemin absolu avec le home directory) avant
+  // sérialisation : il ne doit pas apparaître dans le JSON public.
+  const skills: Skill[] = Array.from(bySlug.values())
+    .map(({ _absolutePath, ...skill }) => skill)
+    .sort((a, b) => {
+      // Perso d'abord, puis par nom
+      if (a.source === "perso" && b.source !== "perso") return -1;
+      if (b.source === "perso" && a.source !== "perso") return 1;
+      return a.name.localeCompare(b.name);
+    });
 
   const agg = aggregate(skills);
 

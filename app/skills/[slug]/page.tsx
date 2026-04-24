@@ -1,6 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, FolderOpen, Package, User, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  ExternalLink,
+  FolderOpen,
+  Lock,
+  Package,
+  RefreshCw,
+  Sparkles,
+  User,
+  Zap,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -109,22 +120,9 @@ export default async function SkillDetailPage({ params }: Params) {
                 })}
               </span>
             </InfoRow>
-            {skill.externalUrl && (
-              <InfoRow
-                icon={<Sparkles className="h-4 w-4" />}
-                label="Source externe"
-              >
-                <a
-                  href={skill.externalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-terracotta-500 underline underline-offset-2"
-                >
-                  {skill.externalUrl}
-                </a>
-              </InfoRow>
-            )}
           </div>
+
+          <UpdateInfo skill={skill} />
         </header>
 
         <div className="prose-skill">
@@ -162,6 +160,116 @@ function SourceBadge({ skill }: { skill: Skill }) {
       <Sparkles className="h-3 w-3" />
       Système
     </span>
+  );
+}
+
+function UpdateInfo({ skill }: { skill: Skill }) {
+  const headerIcon =
+    skill.updateMode === "auto" ? (
+      <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+    ) : skill.updateMode === "manual" ? (
+      <RefreshCw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+    ) : (
+      <Lock className="h-4 w-4 muted-text" />
+    );
+
+  const headerLabel =
+    skill.updateMode === "auto"
+      ? "Mise à jour automatique"
+      : skill.updateMode === "manual"
+        ? "Mise à jour manuelle"
+        : "Skill local";
+
+  return (
+    <div className="surface rounded-2xl p-5 mt-4 space-y-4">
+      <div className="flex items-center gap-2">
+        {headerIcon}
+        <h2 className="font-serif text-lg font-medium">{headerLabel}</h2>
+      </div>
+
+      <UpdateBody skill={skill} />
+    </div>
+  );
+}
+
+function UpdateBody({ skill }: { skill: Skill }) {
+  if (skill.updateMode === "auto") {
+    if (skill.source === "system") {
+      return (
+        <p className="text-sm muted-text leading-relaxed">
+          Ce skill est intégré à Claude Code et est mis à jour automatiquement
+          avec la CLI. Aucune action nécessaire.
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-3">
+        <p className="text-sm muted-text leading-relaxed">
+          Le marketplace{" "}
+          <span className="font-medium text-[rgb(var(--fg))]">
+            {skill.marketplace?.name}
+          </span>{" "}
+          est configuré en auto-update — Claude Code tire les dernières
+          versions automatiquement.
+        </p>
+        {skill.externalUrl && <RepoLink url={skill.externalUrl} />}
+      </div>
+    );
+  }
+
+  if (skill.updateMode === "manual") {
+    if (skill.source === "plugin") {
+      const cmd = `/plugin marketplace update ${skill.marketplace?.name ?? ""}`.trim();
+      return (
+        <div className="space-y-3">
+          <p className="text-sm muted-text leading-relaxed">
+            Le marketplace{" "}
+            <span className="font-medium text-[rgb(var(--fg))]">
+              {skill.marketplace?.name}
+            </span>{" "}
+            n&apos;est pas en auto-update. Lance cette commande dans Claude
+            Code pour puller la dernière version :
+          </p>
+          <div className="flex items-center gap-2 rounded-lg bg-[rgb(var(--bg))] border border-[rgb(var(--border))] px-3 py-2">
+            <code className="flex-1 text-xs font-mono break-all">{cmd}</code>
+            <CopyPathButton path={cmd} />
+          </div>
+          {skill.externalUrl && <RepoLink url={skill.externalUrl} />}
+        </div>
+      );
+    }
+    // Perso avec source amont (frontmatter url/repo)
+    return (
+      <div className="space-y-3">
+        <p className="text-sm muted-text leading-relaxed">
+          Skill perso avec une source amont déclarée. À toi de rapatrier la
+          dernière version depuis le repo d&apos;origine.
+        </p>
+        {skill.externalUrl && <RepoLink url={skill.externalUrl} />}
+      </div>
+    );
+  }
+
+  // local
+  return (
+    <p className="text-sm muted-text leading-relaxed">
+      Skill purement local : aucune source amont n&apos;est déclarée dans le
+      frontmatter. Les modifications vivent uniquement sur ton disque.
+    </p>
+  );
+}
+
+function RepoLink({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 text-sm text-terracotta-500 hover:text-terracotta-600 underline underline-offset-2"
+    >
+      <ExternalLink className="h-3.5 w-3.5" />
+      {url.replace(/^https?:\/\//, "")}
+    </a>
   );
 }
 
