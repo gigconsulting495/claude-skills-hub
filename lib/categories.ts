@@ -271,6 +271,10 @@ export const CATEGORY_OVERRIDES: Record<string, string> = {
 
   // --- Intégrations MCP (skills perso) ---
   "context7-mcp": "mcp",
+
+  // --- Développement (skills perso) ---
+  "resend-better-auth": "developpement",
+  "whisper-transcription-fiable": "developpement",
 };
 
 /** Tags additionnels par skill (s'affichent comme petites étiquettes). */
@@ -311,6 +315,10 @@ export const TAG_OVERRIDES: Record<string, string[]> = {
 
   // --- Skills perso : MCP ---
   "context7-mcp": ["MCP", "Docs"],
+
+  // --- Skills perso : Développement ---
+  "resend-better-auth": ["Next.js", "Auth", "Email"],
+  "whisper-transcription-fiable": ["Whisper", "Transcription", "Audio"],
 };
 
 /** Détecte la catégorie d'un skill (override > keywords > autre). */
